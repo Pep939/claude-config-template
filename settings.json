@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/warm-start.sh",
+            "timeout": 10,
+            "statusMessage": "Warming up..."
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/git-sync-pull.sh 2>&1 || true",
+            "timeout": 30,
+            "statusMessage": "Pulling config from repo..."
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/coord-autospawn.sh 2>&1 || true",
+            "timeout": 5,
+            "statusMessage": "Checking for coord bus..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/git-sync-push.sh 2>&1 || true",
+            "timeout": 30,
+            "statusMessage": "Pushing config to repo..."
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {
+    "my-plugins": {
+      "source": {
+        "source": "directory",
+        "path": "~/.claude/plugins/marketplaces/my-plugins"
+      }
+    }
+  }
+}

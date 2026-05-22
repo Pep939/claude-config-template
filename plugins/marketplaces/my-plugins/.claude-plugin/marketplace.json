@@ -1,0 +1,14 @@
+{
+  "name": "my-plugins",
+  "owner": {
+    "name": "Your Name",
+    "email": "you@example.com"
+  },
+  "plugins": [
+    {
+      "name": "example-plugin",
+      "source": "./plugins/example-plugin",
+      "description": "A worked example plugin. Copy it as a starting point for your own plugins, then remove it."
+    }
+  ]
+}

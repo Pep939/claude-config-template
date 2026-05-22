@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Local cross-session chat — append-only JSONL inbox for Claude Code sessions.
+
+Generated from ~/.claude/coord-template/cli.py.template by spawn.sh.
+Project: __PROJECT_NAME__
+Agents: __AGENTS_LIST__
+
+A minimal send/inbox/history bus. Keeps the file-lock + read-by + needs-human
+protocol; sessions coordinate via git + project state files for the rest.
+
+USAGE (via wrappers):
+    <agent>.sh send <recipient> "msg" [--thread T] [--needs-human]
+    <agent>.sh inbox <my-id>
+    <agent>.sh history [--limit N] [--thread T]
+
+JSONL location: ~/.claude/__PROJECT_NAME__-coord/inbox.jsonl
+"""
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import os
+import random
+import sys
+import time
+import uuid
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+
+# Force utf-8 stdout/stderr on Windows where cp1252 default would crash on
+# arrow / warning unicode chars in our print output. Wrappers (<agent>.sh)
+# already set PYTHONIOENCODING=utf-8 but this lets cli.py be invoked directly.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+HERE = Path(__file__).resolve().parent
+INBOX = HERE / "inbox.jsonl"
+
+# Configured by spawn.sh — edit if your agent set changes.
+AGENTS = __AGENTS_PYTHON_SET__
+HUMAN_ID = "human"  # the human override sender; tagged sender_kind="human"
+VALID_RECIPIENTS = AGENTS | {"all"}
+
+
+def now_iso() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def me() -> str:
+    sender = os.environ.get("CLAUDE_AGENT_ID", "").strip()
+    if sender not in AGENTS and sender != HUMAN_ID:
+        sys.exit(
+            f"ERROR: CLAUDE_AGENT_ID must be one of {sorted(AGENTS) + [HUMAN_ID]}. "
+            "Use the per-agent wrapper script (e.g. <agent>.sh) — it sets this for you."
+        )
+    return sender
+
+
+@contextmanager
+def _file_lock(lock_path: Path, timeout: float = 5.0):
+    """Cross-platform advisory lock via O_EXCL create. Spin-wait + jitter,
+    fall through after timeout (best-effort) so a stale lock doesn't wedge."""
+    deadline = time.monotonic() + timeout
+    acquired = False
+    while time.monotonic() < deadline:
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            acquired = True
+            break
+        except FileExistsError:
+            time.sleep(0.01 + random.random() * 0.02)
+    try:
+        yield acquired
+    finally:
+        try:
+            os.unlink(lock_path)
+        except FileNotFoundError:
+            pass
+
+
+def append_jsonl(path: Path, record: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    line = json.dumps(record) + "\n"
+    with _file_lock(lock_path):
+        with path.open("a", encoding="utf-8") as f:
+            f.write(line)
+
+
+def read_jsonl(path: Path) -> list:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8") as f:
+        out = []
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        return out
+
+
+def rewrite_jsonl(path: Path, records: list) -> None:
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    with _file_lock(lock_path):
+        with path.open("w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+
+
+def cmd_send(args) -> None:
+    if args.to not in VALID_RECIPIENTS:
+        sys.exit(f"ERROR: 'to' must be one of {sorted(VALID_RECIPIENTS)}")
+    sender = me()
+    if args.to == sender:
+        sys.exit(f"ERROR: can't send to yourself ({sender})")
+    rec = {
+        "id": str(uuid.uuid4())[:8],
+        "ts": now_iso(),
+        "from": sender,
+        "to": args.to,
+        "thread": args.thread or "default",
+        "body": args.body,
+        "sender_kind": "human" if (args.human or sender == HUMAN_ID) else "ai",
+        "needs_human": bool(args.needs_human),
+        "read_by": [],
+    }
+    append_jsonl(INBOX, rec)
+    tag = "HUMAN" if rec["sender_kind"] == "human" else "AI"
+    urgent = " [NEEDS-HUMAN]" if rec["needs_human"] else ""
+    print(f"[{rec['id']}·{tag}] {sender} → {args.to} ({rec['thread']}){urgent}")
+    print(f"  {args.body}")
+
+
+def cmd_inbox(args) -> None:
+    who = args.who
+    if who not in AGENTS:
+        sys.exit(f"ERROR: inbox requires one of {sorted(AGENTS)}")
+    msgs = read_jsonl(INBOX)
+    pending = [
+        m for m in msgs
+        if (m["to"] == who or m["to"] == "all")
+        and m["from"] != who
+        and who not in m.get("read_by", [])
+    ]
+    if args.thread:
+        pending = [m for m in pending if m.get("thread") == args.thread]
+    if args.limit:
+        pending = pending[: args.limit]
+    if not pending:
+        print(f"(no unread messages for {who})")
+        return
+    for m in pending:
+        prefix = "[HUMAN] " if m.get("sender_kind") == "human" else ""
+        urgent = " ⚠ NEEDS-HUMAN" if m.get("needs_human") else ""
+        print(
+            f"[{m['id']}·{m['ts']}·{m['thread']}] "
+            f"{prefix}{m['from']} → {m['to']}{urgent}"
+        )
+        print(f"  {m['body']}\n")
+    if args.peek:
+        return
+    pending_ids = {p["id"] for p in pending}
+    all_msgs = read_jsonl(INBOX)
+    for m in all_msgs:
+        if m["id"] in pending_ids:
+            m.setdefault("read_by", [])
+            if who not in m["read_by"]:
+                m["read_by"].append(who)
+    rewrite_jsonl(INBOX, all_msgs)
+
+
+def cmd_history(args) -> None:
+    msgs = read_jsonl(INBOX)
+    if args.thread:
+        msgs = [m for m in msgs if m.get("thread") == args.thread]
+    if args.limit:
+        msgs = msgs[-args.limit :]
+    if not msgs:
+        print("(no messages)")
+        return
+    for m in msgs:
+        prefix = "[HUMAN] " if m.get("sender_kind") == "human" else ""
+        urgent = " ⚠ NEEDS-HUMAN" if m.get("needs_human") else ""
+        print(
+            f"[{m['id']}·{m['ts']}·{m['thread']}] "
+            f"{prefix}{m['from']} → {m['to']}{urgent}"
+        )
+        print(f"  {m['body']}\n")
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        prog="coord", description=f"Coordination bus for project '__PROJECT_NAME__'"
+    )
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    s = sub.add_parser("send", help="Send a message")
+    s.add_argument("to", help=f"one of {sorted(VALID_RECIPIENTS)}")
+    s.add_argument("body")
+    s.add_argument("--thread")
+    s.add_argument("--needs-human", action="store_true")
+    s.add_argument("--human", action="store_true")
+    s.set_defaults(func=cmd_send)
+
+    s = sub.add_parser("inbox", help="Read pending messages")
+    s.add_argument("who", help=f"one of {sorted(AGENTS)}")
+    s.add_argument("--limit", type=int)
+    s.add_argument("--thread")
+    s.add_argument("--peek", action="store_true")
+    s.set_defaults(func=cmd_inbox)
+
+    s = sub.add_parser("history", help="Show recent message history")
+    s.add_argument("--limit", type=int, default=20)
+    s.add_argument("--thread")
+    s.set_defaults(func=cmd_history)
+
+    args = p.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

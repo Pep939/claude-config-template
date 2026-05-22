@@ -1,0 +1,9 @@
+{
+  "name": "example-plugin",
+  "version": "0.1.0",
+  "description": "A worked example plugin showing the manifest and skill layout. Replace it with your own.",
+  "author": {
+    "name": "Your Name",
+    "email": "you@example.com"
+  }
+}

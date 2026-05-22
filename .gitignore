@@ -1,0 +1,135 @@
+# ============================================================
+# ~/.claude/ — global Claude Code config repo
+# Strategy: deny by default for sensitive/ephemeral, explicitly
+# re-include what we want via negation.
+#
+# REVIEW CHECKLIST before first commit:
+#   1. `git status` shows NO file matching: *credentials*, *.env,
+#      *_token*, *_secret*, history.jsonl, *.jsonl
+#   2. `git ls-files | xargs grep -lE "sk-(ant|proj|live)|eyJhbGc|ghp_|AKIA" 2>/dev/null`
+#      returns nothing
+#   3. `installed_plugins.json` is NOT staged (it has machine-local paths)
+#   4. The only marketplace in plugins/marketplaces/ that's tracked
+#      is my-plugins (your own plugins)
+# ============================================================
+
+# ---- Credentials (NEVER commit, defense in depth) ----
+.credentials.json
+credentials/
+**/credentials/
+**/api-keys.json
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+*token*
+*secret*
+*credential*
+*.token
+
+# ---- Cloud SDK cred dirs (defense in depth) ----
+**/.aws/
+**/.gcloud/
+**/.azure/
+
+# ---- Session / chat artifacts (may contain pasted secrets in prompts) ----
+history.jsonl
+*.jsonl
+sessions/
+session-env/
+shell-snapshots/
+
+# ---- Per-session ephemera (UUID-named) ----
+tasks/
+plans/
+backups/
+
+# ---- Per-project coord buses spawned by coord-template/spawn.sh ----
+# These hold live inbox.jsonl with conversation content and per-project state.
+# The template itself (coord-template/) DOES sync; the spawned buses do NOT.
+*-coord/
+
+# ---- Machine-local Claude state ----
+cache/
+chrome/
+downloads/
+file-history/
+ide/
+image-cache/
+paste-cache/
+telemetry/
+agent-memory/
+mcp-needs-auth-cache.json
+# Claude Code's own config file — holds account info, project-trust state, and
+# MCP server configs (which can carry tokens). With CLAUDE_CONFIG_DIR pointed at
+# this repo it lands inside the tree, where the SessionEnd `git add -A` sync would
+# otherwise commit it. Never sync.
+.claude.json
+.claude.json.backup
+# Per-session timestamp file written outside the repo every session — was causing
+# recurring fast-forward conflicts because git-sync-push.sh would `git add -A` it
+# from every machine. Now untracked; rebuilt locally on demand.
+.last-cleanup
+
+# ---- context-mode plugin: derived SQLite indexes (rebuilt on demand) ----
+# Each project gets a hash-named .db (plus -shm/-wal companions). These are
+# pure cache — context-mode regenerates them on first query. Never sync.
+context-mode/content/
+
+# ---- settings.local.json: machine-specific allow rules ----
+# Excluded because absolute paths and allow rules drift between machines.
+# Each machine maintains its own local allow list.
+settings.local.json
+
+# ---- Plugin auto-managed state (only marketplaces/my-plugins syncs) ----
+plugins/cache/
+plugins/data/
+plugins/installed_plugins.json
+plugins/installed_plugins.json.bak-*
+plugins/install-counts-cache.json
+plugins/known_marketplaces.json
+plugins/known_marketplaces.json.bak-*
+
+# Marketplaces: deny all third-party, allow only my-plugins
+plugins/marketplaces/*
+!plugins/marketplaces/my-plugins/
+
+# Inside my-plugins, exclude any cache/build dirs that might appear
+plugins/marketplaces/my-plugins/**/.cache/
+plugins/marketplaces/my-plugins/**/__pycache__/
+plugins/marketplaces/my-plugins/**/node_modules/
+
+# ---- Auto-memory: Option B ----
+# Sync curated .md files in projects/<id>/memory/
+# Exclude session JSONLs, tool-results, and other ephemera.
+projects/**
+!projects/*/
+!projects/*/memory/
+!projects/*/memory/**/*.md
+# Defense-in-depth: even if a JSONL or tool-result lands in memory/, exclude
+projects/**/*.jsonl
+projects/**/tool-results/
+
+# ---- Logs and backup files (can leak request bodies / pre-rotation creds) ----
+*.log
+*.bak
+*.old
+
+# ---- OS / IDE noise ----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/
+.idea/
+
+# ---- Python / Node noise (in case any tooling lands here) ----
+__pycache__/
+*.pyc
+node_modules/
