@@ -48,16 +48,28 @@ can fork it, make it yours, and even keep your fork public without leaking anyth
 
 ## Quick start
 
-```bash
-# 1. Clone into your Claude Code config directory
-git clone https://github.com/Pep939/claude-config-template.git ~/.claude
+> **Already using Claude Code?** You already have a `~/.claude` directory, and
+> this template *becomes* your new one. Move the old one aside first (step 1) —
+> nothing is deleted, and you can copy your own agents, commands, and settings
+> back in afterward.
+>
+> Commands below use `$HOME`, not `~` — PowerShell does not expand `~` for
+> `git`, so `~` would clone into a literal folder named `~`. `$HOME` works in
+> bash and PowerShell alike.
 
-# 2. Run bootstrap
-cd ~/.claude
+```bash
+# 1. Back up any existing config (skip if you've never run Claude Code)
+mv "$HOME/.claude" "$HOME/.claude.backup"
+
+# 2. Clone the template into your Claude Code config directory
+git clone https://github.com/Pep939/claude-config-template.git "$HOME/.claude"
+
+# 3. Run bootstrap
+cd "$HOME/.claude"
 bash bootstrap.sh          # macOS / Linux / Git Bash
 pwsh -File bootstrap.ps1   # Windows PowerShell 7+
 
-# 3. Point the git remote at YOUR own repo
+# 4. Point the git remote at YOUR own repo
 git remote set-url origin <your-repo-url>
 ```
 

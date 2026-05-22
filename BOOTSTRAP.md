@@ -8,18 +8,26 @@ The template ships only generic machinery — no personal content, no secrets.
 
 ## Quick start
 
-```bash
-# 1. Clone the template into your Claude Code config directory
-git clone https://github.com/Pep939/claude-config-template.git ~/.claude
+`$HOME` is used instead of `~` — PowerShell does not expand `~` when passing
+arguments to `git`, so `~` would create a literal folder named `~`. `$HOME`
+works in both bash and PowerShell.
 
-# 2. Run the bootstrap script
-cd ~/.claude
+```bash
+# 1. Back up any existing config (skip if you've never run Claude Code)
+mv "$HOME/.claude" "$HOME/.claude.backup"
+
+# 2. Clone the template into your Claude Code config directory
+git clone https://github.com/Pep939/claude-config-template.git "$HOME/.claude"
+
+# 3. Run the bootstrap script
+cd "$HOME/.claude"
 bash bootstrap.sh          # macOS / Linux / Git Bash
 # or
 pwsh -File bootstrap.ps1   # Windows PowerShell 7+
 ```
 
-Bootstrap is idempotent — safe to re-run any time.
+Bootstrap is idempotent — safe to re-run any time. Your old config is safe in
+`~/.claude.backup` — copy anything you want to keep into the new tree.
 
 ## What bootstrap does
 
