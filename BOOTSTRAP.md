@@ -26,14 +26,16 @@ Bootstrap is idempotent — safe to re-run any time.
 | Step | Action |
 |------|--------|
 | Prereq check | Verifies `claude`, `git`, `node` are installed (and warns on optional `bash` / `wt.exe`). |
-| Read settings | Parses `settings.json` for declared marketplaces and enabled plugins. |
-| Marketplaces | Registers each marketplace from `extraKnownMarketplaces`. |
+| Read settings | Parses `settings.json` for the enabled plugins to install. |
 | Plugins | Installs every enabled plugin with `--scope user`. |
 | Credentials | Creates `credentials/api-keys.json` from a template if it does not exist. |
 | /coord prereqs | Confirms the multi-session coordination bus can run. |
 | MCP note | Reminds you to add any MCP servers your workflow needs. |
 
-Flags: `--skip-plugins` / `-SkipPlugins` skips marketplace + plugin install.
+Marketplaces declared in `settings.json` (`extraKnownMarketplaces`) need no
+bootstrap step — Claude Code registers them automatically on startup.
+
+Flags: `--skip-plugins` / `-SkipPlugins` skips plugin install.
 
 ## What syncs vs. what doesn't
 

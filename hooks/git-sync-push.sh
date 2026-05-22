@@ -9,12 +9,15 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
   exit 0
 fi
 
-# Guard: a synced settings.json hook command must never hardcode a machine-specific
-# user path. "~" expands per-machine; "C:/Users/<name>/" breaks on every other box.
-if grep -nE '"command".*[Uu]sers[/\\]' settings.json 2>/dev/null; then
+# Guard: settings.json must never hardcode a machine-specific user path.
+# "~" expands per-machine; an absolute "C:/Users/<name>/" or "/Users/<name>/"
+# path breaks on every other box AND leaks the username into a public repo.
+# Scans the whole file — catches hook commands and marketplace paths alike.
+if grep -nE '[Uu]sers[/\\]' settings.json 2>/dev/null; then
   echo ""
-  echo "  git-sync-push: ABORT — settings.json hook command has a hardcoded user path (above)."
-  echo "  Fix: replace the C:/Users/<name>/ path with ~/  then end a session to sync."
+  echo "  git-sync-push: ABORT — settings.json has a hardcoded user path (above)."
+  echo "  Fix: replace the absolute C:/Users/<name>/... path with a ~/ path,"
+  echo "  then end a session to sync."
   echo ""
   exit 0
 fi

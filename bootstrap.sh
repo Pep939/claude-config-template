@@ -7,11 +7,13 @@
 #
 # What it does (idempotent — safe to re-run):
 #   1. Verifies prereqs (claude, git, node, optionally wt.exe, bash)
-#   2. Registers plugin marketplaces declared in settings.json
-#   3. Installs all enabled plugins from settings.json
-#   4. Bootstraps credentials/api-keys.json from template if missing
-#   5. Verifies /coord prerequisites
-#   6. Prints a note about adding MCP servers
+#   2. Installs all enabled plugins from settings.json
+#   3. Bootstraps credentials/api-keys.json from template if missing
+#   4. Verifies /coord prerequisites
+#   5. Prints a note about adding MCP servers
+#
+# Marketplaces declared in settings.json (extraKnownMarketplaces) register
+# automatically on Claude Code startup — bootstrap does not touch them.
 #
 # Requires: bash >= 3.2 (runs on stock macOS bash), claude, git, node.
 
@@ -113,37 +115,18 @@ for (const k of Object.keys(s.extraKnownMarketplaces || {})) console.log(k);
 ok "${#MARKETPLACE_NAMES[@]} marketplaces, ${#ENABLED_PLUGINS[@]} plugins declared"
 
 # -------------------------------------------------------------------
-# 3. ADD MARKETPLACES + INSTALL PLUGINS
+# 3. INSTALL ENABLED PLUGINS
 # -------------------------------------------------------------------
+# Marketplaces are deliberately NOT registered here. Claude Code auto-registers
+# every marketplace declared in settings.json (extraKnownMarketplaces) on
+# startup. Running `claude plugin marketplace add` would rewrite the portable
+# "~/..." path in settings.json to a machine-specific absolute path — which
+# then gets committed and synced, leaking the username and breaking the
+# marketplace on every other machine. So marketplaces stay purely declarative.
 if [ "$SKIP_PLUGINS" -eq 0 ]; then
-    section "Plugin marketplaces"
+    section "Installing plugins"
     # ${arr[@]+"${arr[@]}"} = bash 3.2-safe expansion of a possibly-empty array
     # under `set -u` (plain "${arr[@]}" errors as unbound on empty arrays there).
-    for name in ${MARKETPLACE_NAMES[@]+"${MARKETPLACE_NAMES[@]}"}; do
-        # Read source.{source,repo,path} via Node; output: "<type>|<arg>"
-        IFS='|' read -r src_type arg < <(NAME="$name" node -e "
-const s = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
-const m = (s.extraKnownMarketplaces || {})[process.env.NAME] || {};
-const src = m.source || {};
-const arg = src.repo || src.path || '';
-console.log((src.source || 'unknown') + '|' + arg);
-" "$SETTINGS")
-        case "$src_type" in
-            github)    : ;;  # arg = repo, no transformation
-            directory) arg="${arg/#\~/$HOME}" ;;
-            *)
-                warn "Skipped $name — unknown source type $src_type"
-                continue ;;
-        esac
-        echo "  Adding $name -> $arg"
-        if claude plugin marketplace add "$arg" >/dev/null 2>&1; then
-            ok "$name registered"
-        else
-            warn "$name marketplace add failed (may already exist)"
-        fi
-    done
-
-    section "Installing plugins"
     for plugin in ${ENABLED_PLUGINS[@]+"${ENABLED_PLUGINS[@]}"}; do
         echo "  Installing $plugin"
         if claude plugin install "$plugin" --scope user >/dev/null 2>&1; then
@@ -152,6 +135,7 @@ console.log((src.source || 'unknown') + '|' + arg);
             warn "$plugin install failed (may already be installed)"
         fi
     done
+    [ ${#ENABLED_PLUGINS[@]} -eq 0 ] && skip "no plugins enabled in settings.json"
 else
     skip "Plugin install skipped (--skip-plugins)"
 fi

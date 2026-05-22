@@ -15,9 +15,10 @@ can fork it, make it yours, and even keep your fork public without leaking anyth
 
 ## What you get
 
-- **One-command setup on any machine.** `bootstrap.sh` / `bootstrap.ps1` registers
-  your plugin marketplaces and installs every plugin declared in `settings.json` —
-  a fresh `git clone` becomes a working Claude Code config in a single step.
+- **One-command setup on any machine.** `bootstrap.sh` / `bootstrap.ps1` installs
+  every enabled plugin declared in `settings.json` — a fresh `git clone` becomes a
+  working Claude Code config in a single step. (Marketplaces need no setup step:
+  Claude Code registers the ones declared in `settings.json` automatically.)
 - **A multi-session coordination bus.** The included `/coord` command launches
   several Claude Code windows that work one project as a team — a **coordinator**
   that decomposes the goal and delegates, plus **coder / reviewer / tester /

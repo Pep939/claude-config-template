@@ -6,11 +6,13 @@
 #
 # What it does (idempotent - safe to re-run):
 #   1. Verifies prereqs (claude, git, node, optionally wt.exe, bash)
-#   2. Registers plugin marketplaces declared in settings.json
-#   3. Installs all enabled plugins from settings.json
-#   4. Bootstraps credentials/api-keys.json from template if missing
-#   5. Verifies /coord prerequisites (wt.exe, claude on PATH, bash)
-#   6. Prints a note about adding MCP servers
+#   2. Installs all enabled plugins from settings.json
+#   3. Bootstraps credentials/api-keys.json from template if missing
+#   4. Verifies /coord prerequisites (wt.exe, claude on PATH, bash)
+#   5. Prints a note about adding MCP servers
+#
+# Marketplaces declared in settings.json (extraKnownMarketplaces) register
+# automatically on Claude Code startup - bootstrap does not touch them.
 #
 # Exit non-zero only on hard prereq failure. Soft warnings stay non-fatal.
 
@@ -97,35 +99,20 @@ if ($Settings.enabledPlugins) {
 Write-Ok "$($Marketplaces.Count) marketplaces, $($EnabledPlugins.Count) plugins declared"
 
 # -------------------------------------------------------------------
-# 3. ADD MARKETPLACES + INSTALL PLUGINS
+# 3. INSTALL ENABLED PLUGINS
 # -------------------------------------------------------------------
+# Marketplaces are deliberately NOT registered here. Claude Code auto-registers
+# every marketplace declared in settings.json (extraKnownMarketplaces) on
+# startup. Running `claude plugin marketplace add` would rewrite the portable
+# "~/..." path in settings.json to a machine-specific absolute path - which
+# then gets committed and synced, leaking the username and breaking the
+# marketplace on every other machine. So marketplaces stay purely declarative.
 if (-not $SkipPlugins) {
-    Write-Section "Plugin marketplaces"
-    foreach ($name in $Marketplaces.Keys) {
-        $src = $Marketplaces[$name].source
-        $arg = switch ($src.source) {
-            'github'    { $src.repo }
-            'directory' { ($src.path -replace '^~', $HOME) }
-            default     { $null }
-        }
-        if ($null -eq $arg) {
-            Write-Warn "Skipped $name - unknown source type $($src.source)"
-            continue
-        }
-        Write-Host "  Adding $name -> $arg"
-        # A native exe's non-zero exit does not throw in PowerShell, so try/catch
-        # would not catch a failed `claude` call — check $LASTEXITCODE instead.
-        & claude plugin marketplace add $arg 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Ok "$name registered"
-        } else {
-            Write-Warn "$name marketplace add failed (may already exist)"
-        }
-    }
-
     Write-Section "Installing plugins"
     foreach ($plugin in $EnabledPlugins) {
         Write-Host "  Installing $plugin"
+        # A native exe's non-zero exit does not throw in PowerShell, so check
+        # $LASTEXITCODE rather than relying on try/catch.
         & claude plugin install $plugin --scope user 2>&1 | Out-Null
         if ($LASTEXITCODE -eq 0) {
             Write-Ok "$plugin installed"
@@ -133,6 +120,7 @@ if (-not $SkipPlugins) {
             Write-Warn "$plugin install failed (may already be installed)"
         }
     }
+    if ($EnabledPlugins.Count -eq 0) { Write-Skip "no plugins enabled in settings.json" }
 } else {
     Write-Skip 'Plugin install skipped (-SkipPlugins)'
 }
