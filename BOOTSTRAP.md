@@ -40,9 +40,6 @@ Bootstrap is idempotent — safe to re-run any time. Your old config is safe in
 | /coord prereqs | Confirms the multi-session coordination bus can run. |
 | MCP note | Reminds you to add any MCP servers your workflow needs. |
 
-Marketplaces declared in `settings.json` (`extraKnownMarketplaces`) need no
-bootstrap step — Claude Code registers them automatically on startup.
-
 Flags: `--skip-plugins` / `-SkipPlugins` skips plugin install.
 
 ## What syncs vs. what doesn't

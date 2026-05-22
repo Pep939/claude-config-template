@@ -41,12 +41,5 @@
     ]
   },
   "enabledPlugins": {},
-  "extraKnownMarketplaces": {
-    "my-plugins": {
-      "source": {
-        "source": "directory",
-        "path": "~/.claude/plugins/marketplaces/my-plugins"
-      }
-    }
-  }
+  "extraKnownMarketplaces": {}
 }

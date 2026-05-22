@@ -12,8 +12,9 @@
 #   4. Verifies /coord prerequisites
 #   5. Prints a note about adding MCP servers
 #
-# Marketplaces declared in settings.json (extraKnownMarketplaces) register
-# automatically on Claude Code startup — bootstrap does not touch them.
+# Marketplaces (extraKnownMarketplaces in settings.json) are handled by Claude
+# Code itself, not by bootstrap. The template ships none — see README "Add a
+# plugin + skill" for the supported way to add your own.
 #
 # Requires: bash >= 3.2 (runs on stock macOS bash), claude, git, node.
 

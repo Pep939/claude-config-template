@@ -17,8 +17,7 @@ can fork it, make it yours, and even keep your fork public without leaking anyth
 
 - **One-command setup on any machine.** `bootstrap.sh` / `bootstrap.ps1` installs
   every enabled plugin declared in `settings.json` — a fresh `git clone` becomes a
-  working Claude Code config in a single step. (Marketplaces need no setup step:
-  Claude Code registers the ones declared in `settings.json` automatically.)
+  working Claude Code config in a single step.
 - **A multi-session coordination bus.** The included `/coord` command launches
   several Claude Code windows that work one project as a team — a **coordinator**
   that decomposes the goal and delegates, plus **coder / reviewer / tester /
@@ -44,7 +43,7 @@ can fork it, make it yours, and even keep your fork public without leaking anyth
 | `coord-roles/` | Role definitions for the multi-session coordination bus. |
 | `coord-template/` | The coordination-bus scaffolder (`spawn.sh`). |
 | `hooks/` | SessionStart / SessionEnd shell hooks (git sync, warm start). |
-| `plugins/marketplaces/my-plugins/` | Your own plugin marketplace. Includes `example-plugin`. |
+| `plugins/marketplaces/my-plugins/` | Example plugin marketplace layout — copy the `example-plugin` structure. |
 
 ## Quick start
 
@@ -85,13 +84,22 @@ Copy `agents/example-agent.md` as a starting point.
 
 ### Add a plugin + skill
 
-Your plugins live under `plugins/marketplaces/my-plugins/plugins/`.
-Each plugin has a `.claude-plugin/plugin.json` manifest and can contain
+`plugins/marketplaces/my-plugins/plugins/example-plugin/` is a worked example of
+the plugin layout — a `.claude-plugin/plugin.json` manifest plus optional
 `skills/`, `commands/`, `agents/`, and `hooks/`. A skill is a folder with a
-`SKILL.md` (frontmatter `name` + `description`, then the workflow body).
-See `plugins/marketplaces/my-plugins/plugins/example-plugin/` for a worked
-example. Register the plugin by adding it to `enabledPlugins` in
-`settings.json`, then re-run bootstrap.
+`SKILL.md` (frontmatter `name` + `description`, then the workflow body). Copy
+that structure as the starting point for your own plugin.
+
+To actually load plugins, Claude Code installs them from a **marketplace**. The
+portable, supported way is a **`github`-source marketplace** — host your plugins
+in a git repo with a `.claude-plugin/marketplace.json`, declare it in
+`extraKnownMarketplaces` in `settings.json`, and list the plugins you want in
+`enabledPlugins`. Full steps: https://code.claude.com/docs/en/plugin-marketplaces
+
+> Do **not** use a local `directory`-source marketplace in this synced
+> `settings.json`. Anthropic labels `directory` sources development-only, and
+> Claude Code rewrites their path to a machine-specific absolute path on every
+> session start — which then gets committed and breaks sync across machines.
 
 ### Add a coordination role
 
